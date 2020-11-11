@@ -1,54 +1,106 @@
-\documentclass{beamer}
+\documentclass[12pt]{beamer}
+\usepackage{bookmark}
 \usepackage[T1]{fontenc}
-\usepackage{pgfpages}
 
-%\setbeamertemplate{note page}[plain]
-\setbeameroption{show notes on second screen=right}
-%\setbeameroption{show only notes}
-
+\usepackage{booktabs}
 \usepackage{listings}
 \lstset{basicstyle=\tiny}
-\usepackage[bold]{hhtensor}
+
+\usepackage{tikz}
+\usetikzlibrary{calc}
+% tikzmark command, for shading over items
+\newcommand{\tikzmark}[1]{\tikz[overlay,remember picture] \node (#1) {};}
+\usepackage{mathtools}
 \DeclareMathOperator*{\argmin}{arg\,min}
-\usepackage{hyperref}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\Var}{Var}
+\DeclareMathOperator*{\diag}{diag}
+\newcommand{\simiid}{\overset{\text{iid}}{\sim}}
+
+\usepackage[bold]{hhtensor}
+\newcommand{\vx}{\vec{x}}
+\newcommand{\vy}{\vec{y}}
+\newcommand{\cN}{\mathcal{N}}
+
+\usepackage{pdfpages}
+\usepackage{caption}
 
 \usetheme[
     progressbar=foot,
-    sectionpage=none,
+    % sectionpage=none,
 ]{metropolis}
 \setbeamercolor{background canvas}{bg=white}
+\setbeamertemplate{note page}[plain]
+% \setbeameroption{show notes on second screen=right}
+%\setbeameroption{show only notes}
 
 \usepackage{appendixnumberbeamer}
 
-\title{Inference Compilation in Beanmachine}
+\title{Accelerating Metropolis-Hastings with Lightweight Inference Compilation}
 \date{\today}
-\author{Feynman Liang <feynmanl@fb.com>, Nim Arora <nimarora@fb.com>}
-\institute{PPL <: Probability <: AI Infra <: Facebook}
+\author{Feynman Liang, Nim Arora, Nazanin Tehrani, Yucen Li, Michael Tingley, Erik Meijer}
+\institute{Facebook Probability, Facebook AI Infrastructure, UC Berkeley}
 
 \begin{document}
 
-
 \maketitle
 
+\begin{frame}{Table of contents}
+  \setbeamertemplate{section in toc}[sections numbered]
+  \tableofcontents%[hideallsubsections]
+\end{frame}
 
-% \begin{frame}{Table of contents}
-%   \setbeamertemplate{section in toc}[sections numbered]
-%   \tableofcontents%[hideallsubsections]
-% \end{frame}
+\section{Background}
 
-\section{Background on Probabilistic Programming}
+\subsection{Probabilistic Programming}
 
-\begin{frame}[fragile]{Probabilistic programming languages}
+\begin{frame}[c]{Two competing philosophies}
+    \cite{van2018introduction}
+    To build machines that can reason,
+    random variables and probabilstic calculations are:
+    \\~\
+    \\~\
+    \pause
+    \begin{columns}
+    \begin{column}<+->{0.5\textwidth}
+        \textbf{Probabilistic ML}
 
-\begin{quote}
-    Just as programming beyond the simplest algorithms requires tools for abstraction and composition, complex probabilistic modeling requires new progress in model representation—probabilistic programming languages.
-\end{quote}
-\cite{goodman2013principles}
+        An engineering requirement
+
+        \cite{tenenbaum2011grow,ghahramani2015probabilistic}
+    \end{column}
+    \begin{column}<+->{0.5\textwidth}
+        \textbf{Deep Learning}
+
+        Irrelevant 
+
+        \cite{lecun2015deep,goodfellow2016deep}
+    \end{column}
+    \end{columns}
+
+    \note[item]{Automatic differentiation tools for the latter accelerated rapid exploration
+    by offloading tedious gradient calculations to programming language tools}
+    \note[item]{Necessity of programming tools for probabilistic ML motivates PPLs}
+\end{frame}
+
+\begin{frame}[fragile]{Probabilistic programming languages (PPLs)}
+    \begin{quote}
+        Just as programming beyond the simplest algorithms requires tools for abstraction and composition, complex probabilistic modeling requires new progress in model representation—probabilistic programming languages.
+    \end{quote}
+    \cite{goodman2013principles}
+    \note[item]{Fundamentally about developing languages that allow
+    \begin{enumerate}
+        \item Specification of inference problems
+        \item Evaluators to ``solve'' these problems
+    \end{enumerate}
+    }
 \end{frame}
 
 \begin{frame}[fragile]{Abstractions over deterministic computations}
-\begin{minipage}{0.4\linewidth}
-    \begin{lstlisting}[language={[x86masm]Assembler}] 
+    \begin{columns}
+    \begin{column}[T]{0.5\textwidth}
+        \textbf{Low Level Assembly}
+        \begin{lstlisting}[language={[x86masm]Assembler}] 
 mov  dx, msg
 ; ah=9 - "print string" sub-function
 mov  ah, 9
@@ -59,163 +111,340 @@ mov  ah, 0x4c
 int  0x21
 
 msg  db 'Hello, World!', 0x0d, 0x0a, '$'
-    \end{lstlisting}
-\end{minipage}$\iff$
-\begin{minipage}{0.48\linewidth}
-    \begin{lstlisting}[language=python]
-    print("Hello, World!")
-    \end{lstlisting}
-\end{minipage}
-\note[itemize]{
-\item Familiar: Abstraction / composition over assembly code, deterministic computations
-\item Easier to understand, debug, maintain; compiler can optimize as long as results consistent
-\item Same benefits for PPLs, but now for stochastic computations (reasoning under uncertainty)
-}
+        \end{lstlisting}
+    \end{column}
+    \pause
+    \begin{column}[T]{0.5\textwidth}
+        \textbf{High Level Python}
+        \begin{lstlisting}[language=python]
+print("Hello, World!")
+        \end{lstlisting}
+    \end{column}
+    \end{columns}
+    % \note[itemize]{
+    %     \item Familiar: Abstraction / composition over assembly code, deterministic computations
+    %     \item Easier to understand, debug, maintain; compiler can optimize as long as results consistent
+    %     \item Same benefits for PPLs, but now for stochastic computations (reasoning under uncertainty)
+    % }
 \end{frame}
 
 \begin{frame}[fragile]{Abstractions over probabilistic computations}
-\begin{minipage}{0.4\linewidth}
-    \begin{figure}
+
+\begin{columns}
+    \begin{column}<+->{0.4\textwidth}
         \centering
+        \vspace{0.5cm}
         \includegraphics[width=\linewidth]{figures/student-network.png}
-        \caption{Student scenario, \cite{koller2009probabilistic}}
-    \end{figure}
-% graph TD
-%   D[Difficulty] --> G[Grade]
-%   I[Intelligence] --> G
-%   I --> S[SAT]
-%   G --> L[Letter]
-\end{minipage}
-\begin{minipage}{0.58\linewidth}
-    \begin{verbatim}
-    d ~ dPrior
-    i ~ iPrior
-    g ~ gCond(d, i)
-    s ~ sCond(i)
-    l ~ lCond(g)
-    \end{verbatim}
-\end{minipage}
+        \captionof{figure}{\cite{koller2009probabilistic}}
+    \end{column}
+    \begin{column}<+->{0.5\textwidth}
+        \begin{verbatim}
+        d ~ Bernoulli
+        i ~ Normal
+        g ~ g(d, i)
+        s ~ s(i)
+        l ~ Multinomial(g)
+        \end{verbatim}
+    \end{column}
+\end{columns}
 
-\textbf{Example Query}: \texttt{infer(i, {l=Good, s=800})}
+\note[item]{Probabilistic model for student recommendation letters and SAT scores}
+\note[item]{Priors and conditionals}
+\note[item]{Observations (Letter, SAT), Queries (Intelligence)}
 
-Given a student's recommendation \emph{letter} and \emph{SAT} score,
-what should I expect their \emph{intelligence} to be?
-
-
-\note[itemize]{
-    \item Probabilistic model for student recommendation letters and SAT scores
-    \item Priors and conditionals
-    \item Observations (Letter, SAT), Queries (Intelligence)
+\only<+>{\textbf{Generative model}: $P(D, I, G, S, L) = P(D) P(I) P(G \mid D, I) P(S \mid I) P(G \mid L)$ }
+\only<.->{
+    \begin{description}
+        \item[Question]<+->: Given a student's recommendation \emph{letter} and \emph{SAT} score,
+            what should I expect their \emph{intelligence} to be?
+        \item[PPL Query]<+->: \texttt{infer(i, \{l=Good, s=800\})}
+    \end{description}
 }
 \end{frame}
 
-\begin{frame}[fragile]{Monte Carlo approximation}
-\begin{align*}
-    &\mathbb{E}[\text{Intelligence} | \text{Letter}=\text{Good}, \text{SAT}=1600] \\
-    &= \int I \cdot \Pr[\text{Intelligence}=I | \text{Letter}=\text{Good}, \text{SAT}=1600] dI \\
-    &\approx \frac{1}{N} \sum_{n=1}^N I_n
-\end{align*}
-where $I_n \overset{\text{iid}}{\sim} \Pr[\text{Intelligence} | \text{Letter}=\text{Good}, \text{SAT}=1600]$
+\subsection{Bayesian Inference}
 
-\note[itemize]{
-\item Integrals are just really tiny sums, CLT $1/\sqrt{N}$ rate
-\item Can answer this question by drawing samples from the posterior, inference is solved by sampling the posterior
-}
+\begin{frame}{Bayesian Inference Basics}
+    \only<+-.(2)>{
+    \begin{description}
+        \item[Latent Variables] $X$
+        \item[Observed Variables] $Y$
+        \item[Prior] $P(X)$
+        \item[Likelihood] $P(Y \mid X)$
+    \end{description}
+    }
+    \only<+->{\alert{\textbf{Goal}: Approximate the posterior $P(X \mid Y)$}}
+    \only<+>{
+        \includegraphics[width=0.9\textwidth]{figures/intuitive.png}
+        \captionof{figure}{\cite{van2018introduction}}
+    }
+    \only<+>{
+        \begin{tabular}{cc}
+            \toprule
+            $X$ & $Y$ \\
+            \midrule
+            intelligence & letter and grade \\
+            scene description & image \\
+            simulation & simulator output \\
+            program source code & program return value \\
+            policy prior and world simulator & rewards \\
+            cognitive decision making process & observed behavior \\
+            \bottomrule
+        \end{tabular}
+        \captionof{table}{\cite{van2018introduction}}
+    }
 \end{frame}
 
-\begin{frame}[fragile]{Single-site Metropolis Hastings Markov Chain Monte Carlo}
-    How to sample? Consider producing $\{I_n\}$ by:
+\begin{frame}{Why only approximate?}
+    \[
+        P(X \mid Y) 
+        = \frac{P(Y \mid X) P(X)}{P(Y)}
+        = \frac{P(Y \mid X) P(X)}{\underbrace{\int_X P(Y \mid X) P(X) dX}_{\eqqcolon Z(Y)}}
+    \]
+    \pause
+    Denominator $Z(Y)$ (i.e. partition function, marginal likelihood $P(Y)$) high-dimensional integral, 
+    known only for a small family of \emph{conjugate} prior/likelihood pairs
+\end{frame}
+
+\begin{frame}{How to approximate?}
+    \begin{columns}
+        \begin{column}[T]{0.5\textwidth}
+            \only<+->{\textbf{Variational Inference}}
+
+            \only<+->{
+            Let $q_\phi$ be a tractable parametric family
+            (e.g. Gaussian mean-field $q_\phi(X) = \prod_{i=1}^d N(X_i \mid \phi_{1,i},\phi_{2,i})$)
+            }
+
+            \only<+->{
+            \begin{align*}
+            &\argmin_\phi KL(q_\phi(X) \mid P(X \mid Y)) \\
+            &= \argmax_\phi E_{q_\phi}\left[\frac{\log q_\phi(X)}{\log P(X \mid Y)}\right] \\
+            &= \argmax_\phi E_{q_\phi}\left[\frac{\log q_\phi(X)}{\log P(Y \mid X) P(X)}\right]
+            \end{align*}
+            }
+        \end{column}
+
+        \begin{column}[T]{0.5\textwidth}
+            \tikzmark{montecarlo}{
+                \only<1->{\textbf{Monte Carlo}}
+
+                \only<+->{
+                Sample $X_i \overset{\text{iid}}{\sim} P(X \mid Y)$. Then
+                }
+                \only<+->{
+                \begin{align*}
+                    & \mathbb{E}[g(X) | Y] \\
+                    & = \int g(X) \cdot P(X \mid Y) dX \\
+                    & \approx \frac{1}{N} \sum_{n=1}^N g(X_i)
+                \end{align*}
+                }
+            }
+        \end{column}
+    \end{columns}
+    \pause\tikz[overlay,remember picture]{\draw[draw=red,thick,double,fill opacity=0.2] ($(montecarlo)+(-0.5,0.4)$) rectangle ($(montecarlo)+(5.5,-5.2)$);}
+
+    \note[item]{Integrals are just really tiny sums, CLT $1/\sqrt{N}$ rate}
+    \note[item]{Can answer this question by drawing samples from the posterior, inference is solved by sampling the posterior}
+\end{frame}
+
+\section{Inference compilation in declarative PPLs}
+
+\subsection{SIS in imperative PPLs}
+
+\begin{frame}[fragile]{Imperative vs Declarative PPLs}
+    \textbf{Imperative}: Evaluation-based, samples (linear) execution traces
+        (Pyro, Church, WebPPL)
+    \pause
+    \begin{lstlisting}[language=lisp]
+(begin
+    (define geometric
+        (lambda (p)
+        (if (flip p)
+        1
+        (+ 1 (geometric p)))))
+    (geometric .7))
+        \end{lstlisting}
+
+        \includegraphics[width=1.0\textwidth]{figures/execution-trace.png}
+        \captionof{figure}{\cite{wingate2011lightweight}}
+\end{frame}
+
+\begin{frame}{Sequential importance sampling (SIS)}
+    If we can sample $X_i \sim q$ from proposal distribution $q$,
+    \pause
+    \begin{align*}
+        \mathbb{E}_{P(X \mid Y)}[g(X)]
+        &= \mathbb{E}_{P(X \mid Y)}\left[\frac{q(X)}{q(X)} g(X)\right]
+        = \frac{\mathbb{E}_{q}\left[\frac{P(X,Y)}{q(X)} g(X)\right]}{P(Y)} \\
+        &\approx \frac{1}{N} \sum_{i}^N \frac{\frac{P(X_i,Y)}{q(X_i)}}{P(Y)} g(X_i)
+        \approx \sum_{i}^N \frac{\frac{P(X_i,Y)}{q(X_i)}}{\sum_i^N \frac{P(X_i, Y)}{q(X_i)}} g(X_i)
+    \end{align*}
+    \pause
+    Convergence rate $\Var_q\left[\frac{P(X, Y)}{q(X)} g(X)\right]^{-1/2}$ \cite{yuan2007theoretical}
+\end{frame}
+
+\begin{frame}{SIS of execution traces}
+    \begin{enumerate}
+        \item Execute the probabilistic program forwards
+        \item At each stochastic variable (i.e. \texttt{sample} statement),
+            sample from proposer $q(\cdot)$ and assign value
+        \item At each observed random variable (i.e. \texttt{observe} statement),
+            multiply likelihood into trace's importance weight
+    \end{enumerate}
+    \pause
+
+    \textbf{Problem}: Myopic choices from sampling $q$ early in the trace
+    may result in low importance weights later. Would like $q$ to account
+    for observations $Y$.
+\end{frame}
+
+\begin{frame}[fragile]{Constructing a proposal distribution}
+    How to choose $q$? 
+    
+    \pause
+    \textbf{Likelihood-Weighting \cite{norvig2002modern}}: $q(X) = P(X)$
+
+    \pause
+    \textbf{Direct sampling}: $q(X) = P(X \mid Y)$, optimal
+    
+    \pause
+    \textbf{Key Idea}: Exploit access to $P(X,Y)$ to
+    build a proposer $q$ ``close'' to $P(X \mid Y)$?
+\end{frame}
+
+\begin{frame}{Trace-based inference compilation (IC)}
     \begin{itemize}
-        \item Fix $\text{Letter}=\text{Good}$ and $\text{SAT}=1600$
+        \item Construct DNN with parameters $\phi$
+        mapping observations $Y$ (amortized inference, \cite{goodman2013principles})
+        and execution prefix to proposal distribution $q_\phi(\cdot \mid Y)$ 
+        \item Train $q_\phi$ against forward samples from the probabilistic program
+            $p(x,y)$ (inference compilation)
+    \end{itemize}
+
+    \centering
+    \includegraphics[width=0.6\linewidth]{figures/ic.png}
+    \captionof{figure}{\cite{le2017inference}}
+\end{frame}
+
+\begin{frame}{Intuition for inference compilation}
+    \includegraphics[width=\textwidth]{figures/intuition.pdf}
+\end{frame}
+
+\begin{frame}{Trace-based inference compilation (IC)}
+    \centering
+    \includegraphics[width=0.7\linewidth]{figures/ic-lstm.png}
+    \captionof{figure}{\cite{le2017inference}}
+\end{frame}
+
+\begin{frame}[fragile]{Sensitivity to nuisance random variables}
+    \begin{lstlisting}[language=Python]
+def magnitude(obs, M):
+    x = sample(Normal (0, 10))
+    [sample(Normal (0 ,10)) for _ in range(M)] # extend trace with nuisance
+    y = sample(Normal (0 ,10))
+    observe(obs**2, Likelihood=Normal(x**2 + y**2, 0.1)0
+    return x, y
+    \end{lstlisting}
+
+    \includegraphics[width=0.9\textwidth]{figures/attention.png}
+    \captionof{figure}{\cite{harvey2019attention}}
+\end{frame}
+
+\subsection{Lightweight Inference Compilation for MCMC}
+
+\begin{frame}{Imperative vs Declarative PPLs}
+        \textbf{Declarative}: Graph-based, samples instantiated graphical models (i.e. worlds)
+            (BUGS, BLOG, Stan, beanmachine)
+
+        \includegraphics[width=0.8\textwidth]{figures/LDA.png}
+        \captionof{figure}{\cite{blei2003latent}}
+
+        \textbf{Key Idea}: Markov blanket $\text{MB}(X_i)$ available in
+        declarative PPL
+\end{frame}
+
+\begin{frame}[fragile]{MCMC sampling of graphical models}
+    Metropolis-within-Gibbs / Lightweight MH (\cite{wingate2011lightweight}):
+    \begin{itemize}
+        \item Fix observed nodes $Y$ to their values.
         \item Repeat:
         \begin{itemize}
-            \item Pick a single random unobserved node
-            \item Sample a \emph{proposal distribution} $Q(\cdot)$ to propose a new value
-            \item Accept with probability $\alpha$ and revert otherwise, emit $I_n$
+            \item Pick single random unobserved node $X_i$
+            \item Sample proposal $q(X_i)$ to propose new value
+            \item Accept with probability $\alpha$ and revert otherwise
         \end{itemize}
     \end{itemize}
+
+    \pause
     
     \begin{theorem}[\cite{hastings1970monte}]
         With appropriately chosen $\alpha$, the above algorithm yields
         a Markov Chain with the posterior as the invariant distribution.
     \end{theorem}
+
 \end{frame}
 
-\section{Inference Compilation}
-
-\begin{frame}[fragile]{Proposal distributions}
-    Different $Q(\cdot)$ $\implies$ different MCMC algorithms
+\begin{frame}[fragile]{MH proposal distributions}
+    Different $q(\cdot)$ $\implies$ different MCMC algorithms
     
     \begin{itemize}
-        \item Random walk MH: $Q(\cdot)$ isotropic Gaussian
-        \item Newtonian Monte Carlo \cite{arora2020newtonian}:
-        $Q(\cdot) =$ Hessian-based Gaussian
-        \item Hamiltonian Monte Carlo: $Q(\cdot)$ integrates dynamical system
-        \item \emph{Inference Compilation}: $Q(\cdot)$ output of a neural network
+        \item<+-> Random walk MH: $q(\cdot)$ isotropic Gaussian
+        \item<+-> Newtonian Monte Carlo \cite{arora2020newtonian}: $q(\cdot) =$ Gaussian
+            with empirical Fisher information
+        \item<+-> Hamiltonian Monte Carlo: $q(\cdot)$ integrates iso-Hamiltonian system
+        \item<+-> Lightweight Inference Compilation: $q(\cdot \mid \text{MB}(X_i))$ a neural network
+            function of the current Markov Blanket
     \end{itemize}
+
+    \onslide<+->
+    \begin{theorem}[\cite{pearl1987evidential}]
+        Gibbs distributions $P(X_i \mid X_i^c) = P(X_i \mid \text{MB}(X_i))$
+        are optimal proposers $q(\cdot)$
+    \end{theorem}
+
+    \onslide<+->
+    $\therefore$ $\text{MB}(X_i)$ is the minimal sufficient inputs for generating proposal distribution
 \end{frame}
 
-\begin{frame}[fragile]{Prior work: IC in imperative PPLs}
-	\begin{figure}
-	    \centering
-	    \includegraphics[width=0.7\linewidth]{figures/ic.png}
-	    \caption{Inference compilation in SMC \cite{le2017inference}}
-	\end{figure}
-	
-	\note[itemize]{
-	\item Similar
-	\begin{itemize}
-	    \item Forward sampling of PP to generate training data
-	    \item Minimize inclusive KL MC estimate from generated data
-	    \item Amortize IC artifacts across many observations $\vec{y}$
-	\end{itemize}
-	\item Differences
-	\begin{itemize}
-	    \item SIS vs MH, minimal I-map
-	\end{itemize}
-	}
-\end{frame}
-
-\begin{frame}[fragile]{Contribution: IC in declarative PPLs using minimal I-map}
+\begin{frame}[fragile]{LIC artifacts for example student network}
     \begin{minipage}{0.4\linewidth}
-    \begin{figure}
-        \centering
         \includegraphics[width=\linewidth]{figures/student-network.png}
-    \end{figure}
-\end{minipage}
-\begin{minipage}{0.5\linewidth}
-\begin{align*}
-    & q(d | g, i, \text{observations}) \\
-    & q(i | g, d, s, \text{observations}) \\
-    & q(g | i, d, l, \text{observations}) \\
-    & q(s | i, \text{observations}) \\
-    & q(l | g, \text{observations})
-\end{align*}
-\end{minipage}
-    \note[itemize]{
-    \item Each IC proposer only has access to Markov Blanket, respects causal structure
-    \item SIS IC suffers in presence of nuisance parameters, requires attention to perform well
-    \item Explain declarative vs imperative (parents are clearly demarcated)
+    \end{minipage}
+    \begin{minipage}{0.5\linewidth}
+        \begin{align*}
+            & q(d | g, i) \\
+            & q(i | g, d, s) \\
+            & q(g | i, d, l) \\
+            & q(s | i) \\
+            & q(l | g)
+        \end{align*}
+    \end{minipage}
+    \note[item]{
+    Each IC proposer only has access to Markov Blanket, respects causal structure
+    }
+    \note[item]{
+    SIS IC suffers in presence of nuisance parameters, requires attention to perform well
+    }
+    \note[item]{
+    Explain declarative vs imperative (parents are clearly demarcated)
     }
 \end{frame}
 
-\begin{frame}[fragile]{Example IC proposer for "grade"}
+\begin{frame}[fragile]{Example LIC proposer for grade}
 
-\begin{figure}
-    \centering
-    \includegraphics[width=\linewidth]{figures/ic-grade.png}
-    \caption{IC proposer for \texttt{grade}}
+    \includegraphics[width=\textwidth]{figures/ic-grade.png}
 % graph LR
-% 	O["{Letter=A,SAT=800}"] --> Oe{observations FFW NN}
 %   I[intelligence] --> Ie{intelligence FFW NN}
 %   D[difficulty] --> De{difficulty FFW NN}
+%   L[letter] --> Le{letter FFW NN}
 % 	Ie -->|intelligence  embedding vector| MB{Markov blanket LSTM}
 %   De -->|difficulty embedding vector| MB
+%   Le -->|letter embedding vector| MB
 %   MB -->|Markov blanket embedding| P{proposer FFW NN}
-%   Oe --> P
-%   P -->|mean| Q["Q(grade) = N(mean,std)"]
-%   P -->|std| Q
-\end{figure}
+%   P -->|w| Q["Q(grade) = GMM(w, mu, sigma)"]
+%   P -->|mu| Q
+%   P -->|sigma| Q
 
 \note[itemize]{
     \item Markov blanket can change size due to switching variables => LSTM
@@ -224,161 +453,127 @@ where $I_n \overset{\text{iid}}{\sim} \Pr[\text{Intelligence} | \text{Letter}=\t
 }
 \end{frame}
 
+\begin{frame}{Compare against SIS IC's (non-minimal) proposer}
+\begin{columns}
+    \begin{column}{0.4\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/student-network-smc-ic.png}
+    % graph TD
+    %   D[Difficulty] --> G[Grade]
+    %   D --> I
+    %   D --> S
+    %   D --> L
+    %   I[Intelligence] --> G
+    %   I --> S[SAT]
+    %   I --> L
+    %   G --> L[Letter]
+    %   G --> S
+    %   S --> L
+    \end{column}
+    \begin{column}{0.5\linewidth}
+        \begin{align*}
+            & q(d | \text{observations}) \\
+            & q(i|d, \text{observations}) \\
+            & q(g | i, d, \text{observations}) \\
+            & q(s | g, i, d, \text{observations}) \\
+            & q(l | s, g, i, d, \text{observations})
+        \end{align*}
+    \end{column}
+\end{columns}
+\end{frame}
+
 
 \section{Results}
 
-\begin{frame}[fragile]{Normal-normal model}
-	$p \sim N(0.0, 2.0)$, $x \sim N(p, 0.1)$,
-	
-	\textbf{Goal}: Draw samples $\Pr[p \mid x]$
-	
-	\textbf{Conjugacy}: Calculus shows $\Pr[p \mid x] = N(0.9975 x, 0.009975)$,
-	member of variational family $\implies$ zero approximation error
-	
-	\note[itemize]{
-	    \item Conjugate model where we know exact result is a precision weighted average
-	    \item Posterior is normal, in variational family, no approximation error
-	}
+\begin{frame}{Recovering conjugate expressions in normal-normal}
+    \centering
+    $x \sim N(0, 2)$, $y \mid x \sim N(x, 0.1)$
+
+    \textbf{Know}: $y \mid x \sim N(0.999x, 0.0001)$
+
+    \includegraphics[width=0.8\textwidth]{figures/normal_normal_mean.pdf}
 \end{frame}
 
-\begin{frame}[fragile]{Random walk MH on Normal-Normal model}
-    \begin{figure}
-        \centering
-        \includegraphics[width=\linewidth]{figures/rwmh.png}
-        \caption{Random walk MH's proposer mean depends on current value of $p$ in Markov chain}
-    \end{figure}
+\begin{frame}{GMM Mode Escape}
+    \includegraphics[width=\textwidth]{figures/intuition.pdf}
+    \includegraphics[width=\textwidth]{figures/mode_escape.pdf}
 \end{frame}
 
-\begin{frame}[fragile]{IC on Normal-Normal model: the good parts}
-    \begin{figure}
-        \centering
-        \includegraphics[width=0.7\linewidth]{figures/ic_normal_normal.png}
-        \caption{IC on Normal-Normal successfully captures posterior mean [n313855]}
-    \end{figure}
-    \note[itemize]{
-    \item Does not depend on current value of $p$
+\begin{frame}[fragile]{Robustness to nuisance random variables}
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+\begin{lstlisting}[language=Python]
+def magnitude(obs):
+  x = sample(Normal(0, 10))
+  for _ in range(100):
+    nuisance = sample(Normal(0, 10))
+  y = sample(Normal(0, 10))
+  observe(
+    obs**2,
+    likelihood=Normal(x**2 + y**2, 0.1))
+  return x
+\end{lstlisting}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+\begin{lstlisting}[language=Python]
+class NuisanceModel:
+  @random_variable
+  def x(self):
+      return dist.Normal(0, 10)
+  @random_variable
+  def nuisance(self, i):
+      return dist.Normal(0, 10)
+  @random_variable
+  def y(self):
+      return dist.Normal(0, 10)
+  @random_variable
+  def noisy_sq_length(self):
+      return dist.Normal(
+          self.x()**2 + self.y()**2, 
+          0.1)
+\end{lstlisting}
+        \end{column}
+    \end{columns}
+    \begin{tabular}{lccc}
+        \toprule
+                            & \# params & compile time & ESS   \\
+        \midrule
+        LIC (this paper)       & 3,358     & 44 sec.      & 49.75 \\
+        \cite{le2017inference} & 21,952    & 472 sec.     & 10.99 \\
+        \bottomrule
+    \end{tabular}
+\end{frame}
+
+\begin{frame}{Bayesian Logistic Regression}
+    $\vec{\beta} \sim \cN_{d+1}(\vec{0}_{d+1}, \diag(10, 2.5\vec{1}_{d}))$,
+    $y_i \mid \vx_i \simiid \text{Bernoulli}(\sigma(\vec{\beta}^\top \vx_i))$
+    where $\sigma(t) = (1 + e^{-t})^{-1}$
+
+    \includegraphics[width=\textwidth]{figures/blr_pll.pdf}
+    \includegraphics[width=0.66\textwidth]{figures/blr_ess_rhat.pdf}
+\end{frame}
+
+\begin{frame}{n-Schools}
+    \only<1>{\begin{align*}
+        \beta_0     & \sim \text{StudentT}(3, 0, 10)                                                                         \\
+        \tau_{i}    & \sim \text{HalfCauchy}(\sigma_i) \qquad \text{for}~i \in [\text{district}, \text{state}, \text{type}]  \\
+        \beta_{i,j} & \sim \cN(0, \tau_i)  \qquad \text{for}~i \in [\text{district}, \text{state}, \text{type}], j \in [n_i] \\
+        y_k         & \sim \cN(\beta_0 + \sum_i \beta_{i,j_k}, \sigma_k)
+    \end{align*}}
+    \only<2>{
+        \includegraphics[width=\textwidth]{figures/nschools_pll.pdf}
+        \includegraphics[width=0.66\textwidth]{figures/nschools_ess_rhat.pdf}
     }
 \end{frame}
 
-\begin{frame}[fragile]{IC on Normal-Normal model: the bad parts}
-    Sensitive to initialization
-    \begin{figure}
-        \centering
-        \includegraphics[width=0.48\linewidth]{figures/ic_normal_normal_fail_mean.png}
-        \includegraphics[width=0.48\linewidth]{figures/ic_normal_normal_fail_var.png}
-        \caption{Exploding variance on bad initializations [n313855]}
-    \end{figure}
-    \note[itemize]{
-        \item Depends on initialization, sometimes optimization explodes variance to maximize probability
-        \item NOTE: bad variational approximation could still give decent MCMC results; proposer covers support of posterior
-    }
-\end{frame}
+\section{Future directions}
 
-\begin{frame}[fragile]{IC on Normal-Normal model: the bad parts}
-    Local optima problems mitigated by reducing model parameters
-    \begin{figure}
-        \centering
-        \includegraphics[width=0.6\linewidth]{figures/ic_normal_normal_linear.png}
-        \caption{IC with appropriate model size accurately captures posterior mean [n313855]}
-    \end{figure}
-    \note[itemize]{
-        \item 1D observation embedding, no activation functions => can only learn linear functions
-        \item Works here, but not general. Will look at regularization to reduce hypothesis space later.
-    }
-\end{frame}
-
-
-\begin{frame}[fragile]{Vectorized n-schools}
-	\begin{figure}
-	    \centering
-	    \includegraphics[width=0.9\linewidth]{figures/nschools-pll.png}
-	    \caption{Predictive log likelihoods on vectorized n-schools [D22448718]}
-	\end{figure}
-\end{frame}
-
-\begin{frame}[fragile]{Vectorized n-schools}
-	\begin{figure}
-	    \centering
-	    \includegraphics[width=0.7\linewidth]{figures/nschools-compile-infer-time.png}
-	    \caption{IC amortizes compilation costs (10,000 worlds above) through faster inference runtimes}
-	\end{figure}
-\end{frame}
-
-\begin{frame}[fragile]{Vectorized n-schools}
-	\begin{figure}
-	    \centering
-	    \includegraphics[width=0.4\linewidth]{figures/nschools-ic-neff.png}
-	    \caption{IC yields very low ESS (no burn in, 500 samples)}
-	\end{figure}
-\end{frame}
-
-\section{Limitations and next steps}
-
-\begin{frame}[fragile]{Limitations and next steps}
-    \begin{itemize}
-        \item Other variational families (eg GMM, IAF)
-        \item Entropy regularization to address exploding variance
-        \begin{align*}
-            \mathcal{L}(\phi)
-            &= D_{KL}(p(\vec{x} \mid \vec{y}) || q(\vec{x} \mid \vec{y}; \phi) ) + H(q(\vec{x} \mid \vec{y}; \phi))
-        \end{align*}
-    \end{itemize}
-    
-    \begin{figure}
-        \centering
-        \includegraphics[width=0.4\linewidth]{figures/ic-entropy-mean.png}
-        \includegraphics[width=0.4\linewidth]{figures/ic-entropy-var.png}
-        \caption{Entropy regularization penalizes exploding variance, favoring a better variational approximation in Normal-Normal
-        [n313855]}
-    \end{figure}
-
-	\note[itemize]{
-	    \item Currently only diagonal normal (mean-field) and categorical variational families, GMM and IAF can both capture multimodal densities as well as correlations
-	    \item Entropy regularization penalizes exploding variance; how to theoretically justify?
-	}
-\end{frame}
-
-{
-\begin{frame}[standout]
-  Questions?
-\end{frame}
-}
-
-\appendix
-
-\begin{frame}[fragile]{IC in imperative PPLs use non-minimal I-map}
-\begin{minipage}{0.4\linewidth}
-    \begin{figure}
-        \centering
-        \includegraphics[width=\linewidth]{figures/student-network-smc-ic.png}
-    \end{figure}
-% graph TD
-%   D[Difficulty] --> G[Grade]
-%   D --> I
-%   D --> S
-%   D --> L
-%   I[Intelligence] --> G
-%   I --> S[SAT]
-%   I --> L
-%   G --> L[Letter]
-%   G --> S
-%   S --> L
-\end{minipage}
-\begin{minipage}{0.5\linewidth}
-    \begin{align*}
-        & q(d | \text{observations}) \\
-        & q(i|d, \text{observations}) \\
-        & q(g | i, d, \text{observations}) \\
-        & q(s | g, i, d, \text{observations}) \\
-        & q(l | s, g, i, d, \text{observations})
-    \end{align*}
-\end{minipage}
-\end{frame}
-
-
-\begin{frame}[fragile]{Contribution: Online Adaptation}
+\begin{frame}{Adaptive LIC}
     \textbf{Problem}: forward samples during compilation may not sufficiently represent observations ($\text{obs}$) encountered at inference
-    
+
+    RWMH adapts step size \cite{garthwaite2016adaptive}, HMC adapts
+    mass matrix \cite{hoffman2014no}, can LIC adapt NN weights?
+
     \textbf{Solution}: perform MCMC with IC artifact to draw posterior samples $(\vec{x}^{(m)}, \vec{y}^{(m)}=\text{obs}) \sim P(\vec{x} \mid \vec{y}=\text{obs})$,
     hill-climb inclusive KL between \emph{conditional} (rather than joint) posterior
     \begin{align*}
@@ -388,24 +583,39 @@ where $I_n \overset{\text{iid}}{\sim} \Pr[\text{Intelligence} | \text{Letter}=\t
     \end{align*}
 \end{frame}
 
+\begin{frame}{IAF density estimators}
+    \textbf{Problem}: GMM in LIC may not be as expressive
+    as more recently developed density estimators \cite{kingma2016improved}
 
-\begin{frame}[fragile]{IC on Normal-Normal model: the bad parts}
-    Also affects \cite{le2017inference}
-    \begin{figure}
-        \centering
-        \includegraphics[width=0.48\textwidth]{figures/ic-smc-fail.png}
-        \includegraphics[width=0.48\textwidth]{figures/ic-smc-fail-var.png}
-        \caption{\texttt{pyprob}'s\footnote{\tiny\url{https://github.com/pyprob/pyprob/}} IC also exhibits variance explosion
-        \footnote{\tiny\url{https://github.com/facebookexternal/ppl_papers/blob/master/ic/Normal-Normal\%20convergence\%20studies.ipynb
-        }}}
-    \end{figure}
+    \includegraphics[width=0.3\textwidth]{figures/neal_funnel.png}
+    \includegraphics[width=0.3\textwidth]{figures/neal_funnel_gmm.png}
+    \includegraphics[width=0.3\textwidth]{figures/neal_funnel_iaf.png}
+    \captionof{figure}{Neal's funnel (left) and a 7-component isotropic GMM
+    (middle) and 7-layer IAF (right) density approximation}
 \end{frame}
 
-\begin{frame}[allowframebreaks]{References}
+\begin{frame}{Heavy-tailed density estimators}
+    \textbf{Problem}: GMMs and standard IAFs (Lipschitz functions of Gaussians) remain sub-Gaussian,
+    $n$-schools is heavy tailed
 
+    \textbf{Idea}: IAFs with heavy-tailed base distribution
+    \begin{columns}
+        \begin{column}{0.4\textwidth}
+            \includegraphics[width=\textwidth]{figures/heavy_tailed_iaf.png}
+        \end{column}
+        \begin{column}{0.3\textwidth}
+            \includegraphics[width=0.9\textwidth]{figures/heavy_tailed_iaf_normal_ks.png}
+            \includegraphics[width=0.9\textwidth]{figures/heavy_tailed_iaf_studentt_ks.png}
+        \end{column}
+    \end{columns}
+    \captionof{figure}{IAF density estimation of a $\text{Cauchy}(-2, 1)$ (left) and their
+    K-S statistics when using a Normal (right top) and StudentT (right bottom) base distribution}
+\end{frame}
+
+
+\begin{frame}[allowframebreaks]{References}
   \bibliography{refs}
   \bibliographystyle{apalike}
-
 \end{frame}
 
 \end{document}

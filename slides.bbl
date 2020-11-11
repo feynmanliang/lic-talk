@@ -1,0 +1,107 @@
+\begin{thebibliography}{}
+
+\bibitem[Arora et~al., 2020]{arora2020newtonian}
+Arora, N.~S., Tehrani, N.~K., Shah, K.~D., Tingley, M., Li, Y.~L., Torabi, N.,
+  Noursi, D., Masouleh, S.~A., Lippert, E., and Meijer, E. (2020).
+\newblock Newtonian monte carlo: single-site mcmc meets second-order gradient
+  methods.
+
+\bibitem[Blei et~al., 2003]{blei2003latent}
+Blei, D.~M., Ng, A.~Y., and Jordan, M.~I. (2003).
+\newblock Latent dirichlet allocation.
+\newblock {\em Journal of machine Learning research}, 3(Jan):993--1022.
+
+\bibitem[Garthwaite et~al., 2016]{garthwaite2016adaptive}
+Garthwaite, P.~H., Fan, Y., and Sisson, S.~A. (2016).
+\newblock Adaptive optimal scaling of metropolis--hastings algorithms using the
+  robbins--monro process.
+\newblock {\em Communications in Statistics-Theory and Methods},
+  45(17):5098--5111.
+
+\bibitem[Ghahramani, 2015]{ghahramani2015probabilistic}
+Ghahramani, Z. (2015).
+\newblock Probabilistic machine learning and artificial intelligence.
+\newblock {\em Nature}, 521(7553):452--459.
+
+\bibitem[Goodfellow et~al., 2016]{goodfellow2016deep}
+Goodfellow, I., Bengio, Y., Courville, A., and Bengio, Y. (2016).
+\newblock {\em Deep learning}.
+\newblock MIT press Cambridge.
+
+\bibitem[Goodman, 2013]{goodman2013principles}
+Goodman, N.~D. (2013).
+\newblock The principles and practice of probabilistic programming.
+\newblock {\em ACM SIGPLAN Notices}, 48(1):399--402.
+
+\bibitem[Harvey et~al., 2019]{harvey2019attention}
+Harvey, W., Munk, A., Baydin, A.~G., Bergholm, A., and Wood, F. (2019).
+\newblock Attention for inference compilation.
+\newblock {\em arXiv preprint arXiv:1910.11961}.
+
+\bibitem[Hastings, 1970]{hastings1970monte}
+Hastings, W.~K. (1970).
+\newblock Monte carlo sampling methods using markov chains and their
+  applications.
+
+\bibitem[Hoffman and Gelman, 2014]{hoffman2014no}
+Hoffman, M.~D. and Gelman, A. (2014).
+\newblock The no-u-turn sampler: adaptively setting path lengths in hamiltonian
+  monte carlo.
+\newblock {\em J. Mach. Learn. Res.}, 15(1):1593--1623.
+
+\bibitem[Kingma et~al., 2016]{kingma2016improved}
+Kingma, D.~P., Salimans, T., Jozefowicz, R., Chen, X., Sutskever, I., and
+  Welling, M. (2016).
+\newblock Improved variational inference with inverse autoregressive flow.
+\newblock In {\em Advances in neural information processing systems}, pages
+  4743--4751.
+
+\bibitem[Koller and Friedman, 2009]{koller2009probabilistic}
+Koller, D. and Friedman, N. (2009).
+\newblock {\em Probabilistic graphical models: principles and techniques}.
+\newblock MIT press.
+
+\bibitem[Le et~al., 2017]{le2017inference}
+Le, T.~A., Baydin, A.~G., and Wood, F. (2017).
+\newblock Inference compilation and universal probabilistic programming.
+\newblock In {\em Artificial Intelligence and Statistics}, pages 1338--1348.
+
+\bibitem[LeCun et~al., 2015]{lecun2015deep}
+LeCun, Y., Bengio, Y., and Hinton, G. (2015).
+\newblock Deep learning.
+\newblock {\em nature}, 521(7553):436--444.
+
+\bibitem[Norvig and Intelligence, 2002]{norvig2002modern}
+Norvig, P.~R. and Intelligence, S.~A. (2002).
+\newblock {\em A modern approach}.
+\newblock Prentice Hall.
+
+\bibitem[Pearl, 1987]{pearl1987evidential}
+Pearl, J. (1987).
+\newblock Evidential reasoning using stochastic simulation of causal models.
+\newblock {\em Artificial Intelligence}, 32(2):245--257.
+
+\bibitem[Tenenbaum et~al., 2011]{tenenbaum2011grow}
+Tenenbaum, J.~B., Kemp, C., Griffiths, T.~L., and Goodman, N.~D. (2011).
+\newblock How to grow a mind: Statistics, structure, and abstraction.
+\newblock {\em science}, 331(6022):1279--1285.
+
+\bibitem[van~de Meent et~al., 2018]{van2018introduction}
+van~de Meent, J.-W., Paige, B., Yang, H., and Wood, F. (2018).
+\newblock An introduction to probabilistic programming.
+\newblock {\em arXiv preprint arXiv:1809.10756}.
+
+\bibitem[Wingate et~al., 2011]{wingate2011lightweight}
+Wingate, D., Stuhlm{\"u}ller, A., and Goodman, N. (2011).
+\newblock Lightweight implementations of probabilistic programming languages
+  via transformational compilation.
+\newblock In {\em Proceedings of the Fourteenth International Conference on
+  Artificial Intelligence and Statistics}, pages 770--778.
+
+\bibitem[Yuan and Druzdzel, 2007]{yuan2007theoretical}
+Yuan, C. and Druzdzel, M.~J. (2007).
+\newblock Theoretical analysis and practical insights on importance sampling in
+  bayesian networks.
+\newblock {\em International Journal of Approximate Reasoning}, 46(2):320--333.
+
+\end{thebibliography}

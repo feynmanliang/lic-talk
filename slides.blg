@@ -1,0 +1,50 @@
+This is BibTeX, Version 0.99d
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: slides.aux
+Reallocating 'name_of_file' (item size: 1) to 5 items.
+Reallocating 'name_of_file' (item size: 1) to 8 items.
+The style file: apalike.bst
+Database file #1: refs.bib
+Warning--empty journal in hastings1970monte
+You've used 19 entries,
+            1935 wiz_defined-function locations,
+            588 strings with 7048 characters,
+and the built_in function-call counts, 8102 in all, are:
+= -- 791
+> -- 353
+< -- 11
++ -- 128
+- -- 120
+* -- 689
+:= -- 1385
+add.period$ -- 55
+call.type$ -- 19
+change.case$ -- 152
+chr.to.int$ -- 19
+cite$ -- 20
+duplicate$ -- 302
+empty$ -- 554
+format.name$ -- 147
+if$ -- 1585
+int.to.chr$ -- 1
+int.to.str$ -- 0
+missing$ -- 21
+newline$ -- 96
+num.names$ -- 57
+pop$ -- 151
+preamble$ -- 1
+purify$ -- 155
+quote$ -- 0
+skip$ -- 233
+stack$ -- 0
+substring$ -- 594
+swap$ -- 48
+text.length$ -- 3
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 108
+warning$ -- 1
+while$ -- 65
+width$ -- 0
+write$ -- 238
+(There was 1 warning)

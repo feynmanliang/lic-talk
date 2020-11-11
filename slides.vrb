@@ -1,0 +1,43 @@
+\frametitle{Robustness to nuisance random variables}
+\begin{columns}
+        \begin{column}{0.5\textwidth}
+\begin{lstlisting}[language=Python]
+def magnitude(obs):
+  x = sample(Normal(0, 10))
+  for _ in range(100):
+    nuisance = sample(Normal(0, 10))
+  y = sample(Normal(0, 10))
+  observe(
+    obs**2,
+    likelihood=Normal(x**2 + y**2, 0.1))
+  return x
+\end{lstlisting}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+\begin{lstlisting}[language=Python]
+class NuisanceModel:
+  @random_variable
+  def x(self):
+      return dist.Normal(0, 10)
+  @random_variable
+  def nuisance(self, i):
+      return dist.Normal(0, 10)
+  @random_variable
+  def y(self):
+      return dist.Normal(0, 10)
+  @random_variable
+  def noisy_sq_length(self):
+      return dist.Normal(
+          self.x()**2 + self.y()**2,
+          0.1)
+\end{lstlisting}
+        \end{column}
+    \end{columns}
+    \begin{tabular}{lccc}
+        \toprule
+                            & \# params & compile time & ESS   \\
+        \midrule
+        LIC (this paper)       & 3,358     & 44 sec.      & 49.75 \\
+        \cite{le2017inference} & 21,952    & 472 sec.     & 10.99 \\
+        \bottomrule
+    \end{tabular}
